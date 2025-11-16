@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Wallet, TrendingUp, Menu } from "lucide-react";
+import { LayoutDashboard, Wallet, TrendingUp, Menu, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
@@ -15,6 +15,7 @@ const Layout = ({ children }: LayoutProps) => {
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/expenses", icon: Wallet, label: "Gastos" },
     { to: "/investments", icon: TrendingUp, label: "Investimentos" },
+    { to: "/simulation", icon: Calculator, label: "Simulador" },
   ];
 
   const NavLinks = () => (
