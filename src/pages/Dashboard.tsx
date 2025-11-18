@@ -9,6 +9,7 @@ const Dashboard = () => {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedInvestment, setSelectedInvestment] = useState<string | null>(null);
+  const [selectedYears, setSelectedYears] = useState<string[]>(["2024", "2023"]);
 
   // Mock data - será substituído por dados reais depois
   const patrimonioData = [
@@ -43,6 +44,42 @@ const Dashboard = () => {
     { name: "Tesouro", value: 10000, color: "hsl(var(--chart-3))" },
     { name: "Renda Fixa", value: 8000, color: "hsl(var(--chart-4))" },
   ];
+
+  // Dados de comparação ano a ano
+  const yearlyComparisonData = [
+    { mes: "Jan", "2024": 56800, "2023": 42000, "2022": 35000 },
+    { mes: "Fev", "2024": 58200, "2023": 43500, "2022": 36200 },
+    { mes: "Mar", "2024": 59500, "2023": 44800, "2022": 37100 },
+    { mes: "Abr", "2024": 61000, "2023": 46200, "2022": 38500 },
+    { mes: "Mai", "2024": 62500, "2023": 47800, "2022": 39800 },
+    { mes: "Jun", "2024": 64200, "2023": 49000, "2022": 41000 },
+    { mes: "Jul", "2024": 65800, "2023": 50500, "2022": 42500 },
+    { mes: "Ago", "2024": 67200, "2023": 51800, "2022": 43800 },
+    { mes: "Set", "2024": 68900, "2023": 53200, "2022": 45200 },
+    { mes: "Out", "2024": 70500, "2023": 54800, "2022": 46500 },
+    { mes: "Nov", "2024": 72100, "2023": 56200, "2022": 47900 },
+    { mes: "Dez", "2024": 73800, "2023": 57800, "2022": 49200 },
+  ];
+
+  const yearlyIncomeData = [
+    { ano: "2020", receitas: 85000, despesas: 62000 },
+    { ano: "2021", receitas: 92000, despesas: 65000 },
+    { ano: "2022", receitas: 98000, despesas: 68000 },
+    { ano: "2023", receitas: 104000, despesas: 71000 },
+    { ano: "2024", receitas: 110000, despesas: 73000 },
+  ];
+
+  const availableYears = ["2024", "2023", "2022"];
+
+  const toggleYear = (year: string) => {
+    if (selectedYears.includes(year)) {
+      if (selectedYears.length > 1) {
+        setSelectedYears(selectedYears.filter(y => y !== year));
+      }
+    } else {
+      setSelectedYears([...selectedYears, year]);
+    }
+  };
 
   const handleMonthClick = (data: any) => {
     setSelectedMonth(selectedMonth === data.mes ? null : data.mes);
@@ -301,6 +338,154 @@ const Dashboard = () => {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Comparação Ano a Ano */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-2xl font-bold tracking-tight">Comparação Ano a Ano</h3>
+            <p className="text-muted-foreground mt-1">
+              Visualize a evolução das suas finanças ao longo dos anos
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {availableYears.map(year => (
+              <Badge
+                key={year}
+                variant={selectedYears.includes(year) ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => toggleYear(year)}
+              >
+                {year}
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle>Evolução Patrimonial por Ano</CardTitle>
+              <CardDescription>Comparação mensal entre os anos selecionados</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={yearlyComparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="mes" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)"
+                    }}
+                  />
+                  <Legend />
+                  {selectedYears.includes("2024") && (
+                    <Line 
+                      type="monotone" 
+                      dataKey="2024" 
+                      stroke="hsl(var(--chart-1))" 
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(var(--chart-1))", r: 4 }}
+                    />
+                  )}
+                  {selectedYears.includes("2023") && (
+                    <Line 
+                      type="monotone" 
+                      dataKey="2023" 
+                      stroke="hsl(var(--chart-2))" 
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(var(--chart-2))", r: 4 }}
+                    />
+                  )}
+                  {selectedYears.includes("2022") && (
+                    <Line 
+                      type="monotone" 
+                      dataKey="2022" 
+                      stroke="hsl(var(--chart-3))" 
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(var(--chart-3))", r: 4 }}
+                    />
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle>Receitas vs Despesas Anuais</CardTitle>
+              <CardDescription>Comparação total por ano</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={yearlyIncomeData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="ano" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)"
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="receitas" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="despesas" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Cards de Estatísticas Anuais */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="bg-gradient-to-br from-success/10 to-success/5 border-success/20">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Crescimento Patrimonial (2023-2024)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-success">+27.6%</div>
+              <p className="text-xs text-muted-foreground mt-2">
+                De R$ 57.800 para R$ 73.800
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Economia Média Anual
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">R$ 35.400</div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Baseado nos últimos 5 anos
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-warning/10 to-warning/5 border-warning/20">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Taxa de Crescimento Anual
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-warning">12.3%</div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Média dos últimos 3 anos
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
