@@ -1,9 +1,11 @@
 import { Wallet, TrendingUp, TrendingDown, PiggyBank } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import StatCard from "@/components/StatCard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import { useTransactions } from "@/hooks/useTransactions";
+import { useInvestments } from "@/hooks/useInvestments";
 
 const Dashboard = () => {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -11,65 +13,216 @@ const Dashboard = () => {
   const [selectedInvestment, setSelectedInvestment] = useState<string | null>(null);
   const [selectedYears, setSelectedYears] = useState<string[]>(["2024", "2023"]);
 
-  // Mock data - será substituído por dados reais depois
-  const patrimonioData = [
-    { mes: "Jan", valor: 45000 },
-    { mes: "Fev", valor: 48000 },
-    { mes: "Mar", valor: 47500 },
-    { mes: "Abr", valor: 51000 },
-    { mes: "Mai", valor: 53500 },
-    { mes: "Jun", valor: 56800 },
-  ];
+  const { transactions, isLoading: loadingTransactions } = useTransactions();
+  const { investments, isLoading: loadingInvestments } = useInvestments();
 
-  const fluxoCaixaData = [
-    { mes: "Jan", receitas: 8000, despesas: 5500 },
-    { mes: "Fev", receitas: 8200, despesas: 5800 },
-    { mes: "Mar", receitas: 8000, despesas: 6200 },
-    { mes: "Abr", receitas: 8500, despesas: 5400 },
-    { mes: "Mai", receitas: 8300, despesas: 5600 },
-    { mes: "Jun", receitas: 8700, despesas: 5300 },
-  ];
+  // Calcular dados reais a partir das transações e investimentos
+  const dashboardData = useMemo(() => {
+    if (loadingTransactions || loadingInvestments) {
+      return null;
+    }
 
-  const categoriesData = [
-    { name: "Moradia", value: 2000, color: "hsl(var(--chart-1))" },
-    { name: "Alimentação", value: 1200, color: "hsl(var(--chart-2))" },
-    { name: "Transporte", value: 800, color: "hsl(var(--chart-3))" },
-    { name: "Lazer", value: 600, color: "hsl(var(--chart-4))" },
-    { name: "Outros", value: 700, color: "hsl(var(--chart-5))" },
-  ];
+    const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    const currentYear = new Date().getFullYear();
+    
+    // Agrupar transações por mês
+    const monthlyData: { [key: string]: { income: number; expense: number; month: number; year: number } } = {};
+    
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+      
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = { income: 0, expense: 0, month: date.getMonth(), year: date.getFullYear() };
+      }
+      
+      if (transaction.type === 'income') {
+        monthlyData[monthKey].income += transaction.amount;
+      } else {
+        monthlyData[monthKey].expense += transaction.amount;
+      }
+    });
 
-  const investmentsData = [
-    { name: "Ações", value: 25000, color: "hsl(var(--chart-1))" },
-    { name: "FIIs", value: 15000, color: "hsl(var(--chart-2))" },
-    { name: "Tesouro", value: 10000, color: "hsl(var(--chart-3))" },
-    { name: "Renda Fixa", value: 8000, color: "hsl(var(--chart-4))" },
-  ];
+    // Calcular patrimônio acumulado por mês (últimos 6 meses)
+    const last6Months = [];
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      last6Months.push({
+        month: date.getMonth(),
+        year: date.getFullYear(),
+        name: monthNames[date.getMonth()]
+      });
+    }
 
-  // Dados de comparação ano a ano
-  const yearlyComparisonData = [
-    { mes: "Jan", "2024": 56800, "2023": 42000, "2022": 35000 },
-    { mes: "Fev", "2024": 58200, "2023": 43500, "2022": 36200 },
-    { mes: "Mar", "2024": 59500, "2023": 44800, "2022": 37100 },
-    { mes: "Abr", "2024": 61000, "2023": 46200, "2022": 38500 },
-    { mes: "Mai", "2024": 62500, "2023": 47800, "2022": 39800 },
-    { mes: "Jun", "2024": 64200, "2023": 49000, "2022": 41000 },
-    { mes: "Jul", "2024": 65800, "2023": 50500, "2022": 42500 },
-    { mes: "Ago", "2024": 67200, "2023": 51800, "2022": 43800 },
-    { mes: "Set", "2024": 68900, "2023": 53200, "2022": 45200 },
-    { mes: "Out", "2024": 70500, "2023": 54800, "2022": 46500 },
-    { mes: "Nov", "2024": 72100, "2023": 56200, "2022": 47900 },
-    { mes: "Dez", "2024": 73800, "2023": 57800, "2022": 49200 },
-  ];
+    let accumulatedWealth = 0;
+    const patrimonioData = last6Months.map(({ month, year, name }) => {
+      const key = `${year}-${month}`;
+      const data = monthlyData[key] || { income: 0, expense: 0 };
+      accumulatedWealth += data.income - data.expense;
+      return {
+        mes: name,
+        valor: Math.max(0, accumulatedWealth)
+      };
+    });
 
-  const yearlyIncomeData = [
-    { ano: "2020", receitas: 85000, despesas: 62000 },
-    { ano: "2021", receitas: 92000, despesas: 65000 },
-    { ano: "2022", receitas: 98000, despesas: 68000 },
-    { ano: "2023", receitas: 104000, despesas: 71000 },
-    { ano: "2024", receitas: 110000, despesas: 73000 },
-  ];
+    // Fluxo de caixa (últimos 6 meses)
+    const fluxoCaixaData = last6Months.map(({ month, year, name }) => {
+      const key = `${year}-${month}`;
+      const data = monthlyData[key] || { income: 0, expense: 0 };
+      return {
+        mes: name,
+        receitas: data.income,
+        despesas: data.expense
+      };
+    });
 
-  const availableYears = ["2024", "2023", "2022"];
+    // Gastos por categoria (mês atual)
+    const categoryData: { [key: string]: number } = {};
+    const currentMonth = new Date().getMonth();
+    const currentMonthTransactions = transactions.filter(t => {
+      const date = new Date(t.date);
+      return t.type === 'expense' && date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+    });
+
+    currentMonthTransactions.forEach(transaction => {
+      if (!categoryData[transaction.category]) {
+        categoryData[transaction.category] = 0;
+      }
+      categoryData[transaction.category] += transaction.amount;
+    });
+
+    const categoriesData = Object.entries(categoryData).map(([name, value], index) => ({
+      name,
+      value,
+      color: `hsl(var(--chart-${(index % 5) + 1}))`
+    }));
+
+    // Distribuição de investimentos por tipo
+    const investmentsByType: { [key: string]: number } = {};
+    investments.forEach(investment => {
+      const currentValue = investment.current_price * investment.quantity;
+      if (!investmentsByType[investment.asset_type]) {
+        investmentsByType[investment.asset_type] = 0;
+      }
+      investmentsByType[investment.asset_type] += currentValue;
+    });
+
+    const investmentsData = Object.entries(investmentsByType).map(([name, value], index) => ({
+      name,
+      value,
+      color: `hsl(var(--chart-${(index % 5) + 1}))`
+    }));
+
+    // Calcular totais
+    const totalInvested = investments.reduce((sum, inv) => sum + (inv.purchase_price * inv.quantity), 0);
+    const totalCurrentInvestments = investments.reduce((sum, inv) => sum + (inv.current_price * inv.quantity), 0);
+    
+    const currentMonthIncome = fluxoCaixaData[fluxoCaixaData.length - 1]?.receitas || 0;
+    const currentMonthExpense = fluxoCaixaData[fluxoCaixaData.length - 1]?.despesas || 0;
+    const previousMonthIncome = fluxoCaixaData[fluxoCaixaData.length - 2]?.receitas || 0;
+    const previousMonthExpense = fluxoCaixaData[fluxoCaixaData.length - 2]?.despesas || 0;
+
+    const netWorth = patrimonioData[patrimonioData.length - 1]?.valor || 0;
+    const previousNetWorth = patrimonioData[patrimonioData.length - 2]?.valor || 0;
+    
+    const incomeTrend = previousMonthIncome > 0 
+      ? ((currentMonthIncome - previousMonthIncome) / previousMonthIncome * 100).toFixed(1)
+      : "0.0";
+    const expenseTrend = previousMonthExpense > 0
+      ? ((currentMonthExpense - previousMonthExpense) / previousMonthExpense * 100).toFixed(1)
+      : "0.0";
+    const wealthTrend = previousNetWorth > 0
+      ? ((netWorth - previousNetWorth) / previousNetWorth * 100).toFixed(1)
+      : "0.0";
+    const investmentTrend = totalInvested > 0
+      ? (((totalCurrentInvestments - totalInvested) / totalInvested) * 100).toFixed(1)
+      : "0.0";
+
+    // Dados de comparação ano a ano
+    const yearlyData: { [key: string]: { [month: number]: number } } = {};
+    const years = [currentYear, currentYear - 1, currentYear - 2];
+    
+    years.forEach(year => {
+      yearlyData[year] = {};
+      for (let month = 0; month < 12; month++) {
+        yearlyData[year][month] = 0;
+      }
+    });
+
+    // Calcular patrimônio acumulado por ano
+    years.forEach(year => {
+      let accumulated = 0;
+      for (let month = 0; month < 12; month++) {
+        const key = `${year}-${month}`;
+        const data = monthlyData[key] || { income: 0, expense: 0 };
+        accumulated += data.income - data.expense;
+        yearlyData[year][month] = Math.max(0, accumulated);
+      }
+    });
+
+    const yearlyComparisonData = monthNames.map((mes, index) => {
+      const dataPoint: any = { mes };
+      years.forEach(year => {
+        dataPoint[year.toString()] = yearlyData[year][index];
+      });
+      return dataPoint;
+    });
+
+    // Receitas vs Despesas Anuais
+    const yearlyIncomeData = years.map(year => {
+      let totalIncome = 0;
+      let totalExpense = 0;
+      
+      transactions.forEach(transaction => {
+        const date = new Date(transaction.date);
+        if (date.getFullYear() === year) {
+          if (transaction.type === 'income') {
+            totalIncome += transaction.amount;
+          } else {
+            totalExpense += transaction.amount;
+          }
+        }
+      });
+
+      return {
+        ano: year.toString(),
+        receitas: totalIncome,
+        despesas: totalExpense
+      };
+    }).reverse();
+
+    return {
+      patrimonioData,
+      fluxoCaixaData,
+      categoriesData,
+      investmentsData,
+      stats: {
+        netWorth,
+        totalCurrentInvestments,
+        currentMonthIncome,
+        currentMonthExpense,
+        wealthTrend: parseFloat(wealthTrend),
+        investmentTrend: parseFloat(investmentTrend),
+        incomeTrend: parseFloat(incomeTrend),
+        expenseTrend: parseFloat(expenseTrend)
+      },
+      yearlyComparisonData,
+      yearlyIncomeData,
+      availableYears: years.map(y => y.toString())
+    };
+  }, [transactions, investments, loadingTransactions, loadingInvestments]);
+
+  if (loadingTransactions || loadingInvestments || !dashboardData) {
+    return (
+      <div className="flex items-center justify-center h-[400px]">
+        <p className="text-muted-foreground">Carregando dados...</p>
+      </div>
+    );
+  }
+
+  const { patrimonioData, fluxoCaixaData, categoriesData, investmentsData, stats, yearlyComparisonData, yearlyIncomeData, availableYears } = dashboardData;
+
 
   const toggleYear = (year: string) => {
     if (selectedYears.includes(year)) {
@@ -141,29 +294,29 @@ const Dashboard = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Patrimônio Líquido"
-          value="R$ 56.800"
+          value={`R$ ${stats.netWorth.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           icon={PiggyBank}
-          trend={{ value: "5.6%", positive: true }}
+          trend={{ value: `${Math.abs(stats.wealthTrend).toFixed(1)}%`, positive: stats.wealthTrend >= 0 }}
           variant="success"
         />
         <StatCard
           title="Investimentos"
-          value="R$ 58.000"
+          value={`R$ ${stats.totalCurrentInvestments.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           icon={TrendingUp}
-          trend={{ value: "3.2%", positive: true }}
+          trend={{ value: `${Math.abs(stats.investmentTrend).toFixed(1)}%`, positive: stats.investmentTrend >= 0 }}
           variant="success"
         />
         <StatCard
           title="Receitas (mês)"
-          value="R$ 8.700"
+          value={`R$ ${stats.currentMonthIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           icon={TrendingUp}
-          trend={{ value: "4.8%", positive: true }}
+          trend={{ value: `${Math.abs(stats.incomeTrend).toFixed(1)}%`, positive: stats.incomeTrend >= 0 }}
         />
         <StatCard
           title="Despesas (mês)"
-          value="R$ 5.300"
+          value={`R$ ${stats.currentMonthExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           icon={TrendingDown}
-          trend={{ value: "5.4%", positive: false }}
+          trend={{ value: `${Math.abs(stats.expenseTrend).toFixed(1)}%`, positive: stats.expenseTrend < 0 }}
           variant="destructive"
         />
       </div>
@@ -383,32 +536,17 @@ const Dashboard = () => {
                     }}
                   />
                   <Legend />
-                  {selectedYears.includes("2024") && (
-                    <Line 
-                      type="monotone" 
-                      dataKey="2024" 
-                      stroke="hsl(var(--chart-1))" 
-                      strokeWidth={2}
-                      dot={{ fill: "hsl(var(--chart-1))", r: 4 }}
-                    />
-                  )}
-                  {selectedYears.includes("2023") && (
-                    <Line 
-                      type="monotone" 
-                      dataKey="2023" 
-                      stroke="hsl(var(--chart-2))" 
-                      strokeWidth={2}
-                      dot={{ fill: "hsl(var(--chart-2))", r: 4 }}
-                    />
-                  )}
-                  {selectedYears.includes("2022") && (
-                    <Line 
-                      type="monotone" 
-                      dataKey="2022" 
-                      stroke="hsl(var(--chart-3))" 
-                      strokeWidth={2}
-                      dot={{ fill: "hsl(var(--chart-3))", r: 4 }}
-                    />
+                   {availableYears.map((year, index) => 
+                    selectedYears.includes(year) && (
+                      <Line 
+                        key={year}
+                        type="monotone" 
+                        dataKey={year} 
+                        stroke={`hsl(var(--chart-${(index % 5) + 1}))`}
+                        strokeWidth={2}
+                        dot={{ fill: `hsl(var(--chart-${(index % 5) + 1}))`, r: 4 }}
+                      />
+                    )
                   )}
                 </LineChart>
               </ResponsiveContainer>
