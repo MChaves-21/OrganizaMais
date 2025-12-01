@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Wallet, TrendingUp, Menu, Calculator, LogOut, LogIn, Moon, Sun, Target, Receipt } from "lucide-react";
+import { LayoutDashboard, Wallet, TrendingUp, Menu, Calculator, LogOut, LogIn, Moon, Sun, Target, Receipt, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,6 +55,7 @@ const Layout = ({ children }: LayoutProps) => {
     { to: "/goals", icon: Target, label: "Metas" },
     { to: "/budgets", icon: Receipt, label: "Orçamentos" },
     { to: "/simulation", icon: Calculator, label: "Simulador" },
+    { to: "/reports", icon: FileText, label: "Relatórios" },
   ];
 
   const NavLinks = () => (
