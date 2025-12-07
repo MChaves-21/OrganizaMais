@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Area, AreaChart } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Area, AreaChart, PieChart, Pie, Cell, Legend } from "recharts";
 
 const Investments = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -136,6 +136,40 @@ const Investments = () => {
         };
       });
   }, [investments, selectedAssetType]);
+
+  // Calculate portfolio distribution by asset type
+  const portfolioDistribution = useMemo(() => {
+    if (investments.length === 0) return [];
+
+    const COLORS = [
+      'hsl(var(--primary))',
+      'hsl(var(--success))',
+      'hsl(var(--warning))',
+      'hsl(var(--destructive))',
+      'hsl(var(--secondary))',
+      'hsl(215 70% 50%)',
+      'hsl(280 70% 50%)',
+    ];
+
+    const distribution: { [key: string]: number } = {};
+    let totalValue = 0;
+
+    investments.forEach(inv => {
+      const currentValue = inv.current_price * inv.quantity;
+      totalValue += currentValue;
+      if (!distribution[inv.asset_type]) {
+        distribution[inv.asset_type] = 0;
+      }
+      distribution[inv.asset_type] += currentValue;
+    });
+
+    return Object.entries(distribution).map(([name, value], index) => ({
+      name,
+      value: Math.round(value * 100) / 100,
+      percentage: totalValue > 0 ? ((value / totalValue) * 100).toFixed(1) : '0.0',
+      color: COLORS[index % COLORS.length]
+    }));
+  }, [investments]);
 
   const handleSubmit = () => {
     if (!formData.asset_name || !formData.asset_type || !formData.quantity || !formData.purchase_price || !formData.current_price) {
@@ -388,6 +422,55 @@ const Investments = () => {
               <Bar dataKey="rendimento" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Portfolio Distribution Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Distribuição da Carteira</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {portfolioDistribution.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              Adicione investimentos para ver a distribuição
+            </p>
+          ) : (
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={portfolioDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percentage }) => `${name}: ${percentage}%`}
+                    labelLine={false}
+                  >
+                    {portfolioDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)"
+                    }}
+                    formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`]}
+                  />
+                  <Legend 
+                    formatter={(value, entry: any) => (
+                      <span className="text-foreground">{value}</span>
+                    )}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </CardContent>
       </Card>
 
