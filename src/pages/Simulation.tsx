@@ -4,10 +4,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calculator, Target, TrendingUp, FileDown } from "lucide-react";
+import { Calculator, Target, TrendingUp, FileDown, Plus, X, GitCompare } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+
+interface SavedSimulation {
+  id: string;
+  type: "goal" | "contribution";
+  name: string;
+  initialValue: number;
+  target?: number;
+  monthlyContribution?: number;
+  years: number;
+  rate: number;
+  result: number;
+  totalInvested?: number;
+  earnings?: number;
+  createdAt: Date;
+}
 
 const Simulation = () => {
   // Goal-driven projection
@@ -27,6 +42,9 @@ const Simulation = () => {
     totalInvested: number;
     earnings: number;
   } | null>(null);
+
+  // Saved simulations for comparison
+  const [savedSimulations, setSavedSimulations] = useState<SavedSimulation[]>([]);
 
   const calculateMonthlyContribution = () => {
     const initial = parseFloat(goalInitialValue) || 0;
@@ -220,6 +238,52 @@ const Simulation = () => {
     doc.save(`simulacao-aporte-${date.replace(/\//g, "-")}.pdf`);
   };
 
+  const saveGoalSimulation = () => {
+    if (goalResult === null) return;
+    
+    const simulation: SavedSimulation = {
+      id: Date.now().toString(),
+      type: "goal",
+      name: `Meta ${formatCurrency(parseFloat(goalTarget))} em ${goalYears}a`,
+      initialValue: parseFloat(goalInitialValue) || 0,
+      target: parseFloat(goalTarget),
+      years: parseFloat(goalYears),
+      rate: parseFloat(goalRate),
+      result: goalResult,
+      createdAt: new Date(),
+    };
+    
+    setSavedSimulations([...savedSimulations, simulation]);
+  };
+
+  const saveContributionSimulation = () => {
+    if (!contributionResult) return;
+    
+    const simulation: SavedSimulation = {
+      id: Date.now().toString(),
+      type: "contribution",
+      name: `${formatCurrency(parseFloat(monthlyContribution))}/mês por ${contributionYears}a`,
+      initialValue: parseFloat(contributionInitialValue) || 0,
+      monthlyContribution: parseFloat(monthlyContribution),
+      years: parseFloat(contributionYears),
+      rate: parseFloat(contributionRate),
+      result: contributionResult.futureValue,
+      totalInvested: contributionResult.totalInvested,
+      earnings: contributionResult.earnings,
+      createdAt: new Date(),
+    };
+    
+    setSavedSimulations([...savedSimulations, simulation]);
+  };
+
+  const removeSimulation = (id: string) => {
+    setSavedSimulations(savedSimulations.filter(s => s.id !== id));
+  };
+
+  const clearAllSimulations = () => {
+    setSavedSimulations([]);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -229,7 +293,7 @@ const Simulation = () => {
         </div>
 
         <Tabs defaultValue="goal" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="goal" className="gap-2">
               <Target className="h-4 w-4" />
               Por Meta
@@ -237,6 +301,10 @@ const Simulation = () => {
             <TabsTrigger value="contribution" className="gap-2">
               <TrendingUp className="h-4 w-4" />
               Por Aporte
+            </TabsTrigger>
+            <TabsTrigger value="compare" className="gap-2">
+              <GitCompare className="h-4 w-4" />
+              Comparar ({savedSimulations.length})
             </TabsTrigger>
           </TabsList>
 
@@ -298,10 +366,16 @@ const Simulation = () => {
                     Calcular Aporte Mensal
                   </Button>
                   {goalResult !== null && (
-                    <Button variant="outline" onClick={exportGoalSimulationPDF}>
-                      <FileDown className="h-4 w-4 mr-2" />
-                      PDF
-                    </Button>
+                    <>
+                      <Button variant="outline" onClick={saveGoalSimulation}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Comparar
+                      </Button>
+                      <Button variant="outline" onClick={exportGoalSimulationPDF}>
+                        <FileDown className="h-4 w-4 mr-2" />
+                        PDF
+                      </Button>
+                    </>
                   )}
                 </div>
 
@@ -402,10 +476,16 @@ const Simulation = () => {
                     Calcular Valor Futuro
                   </Button>
                   {contributionResult && (
-                    <Button variant="outline" onClick={exportContributionSimulationPDF}>
-                      <FileDown className="h-4 w-4 mr-2" />
-                      PDF
-                    </Button>
+                    <>
+                      <Button variant="outline" onClick={saveContributionSimulation}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Comparar
+                      </Button>
+                      <Button variant="outline" onClick={exportContributionSimulationPDF}>
+                        <FileDown className="h-4 w-4 mr-2" />
+                        PDF
+                      </Button>
+                    </>
                   )}
                 </div>
 
@@ -516,6 +596,122 @@ const Simulation = () => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="compare" className="mt-6">
+            <Card className="border-border/50 shadow-elegant">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Comparação de Simulações</CardTitle>
+                    <CardDescription>
+                      Compare diferentes cenários de investimento lado a lado
+                    </CardDescription>
+                  </div>
+                  {savedSimulations.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={clearAllSimulations}>
+                      <X className="h-4 w-4 mr-2" />
+                      Limpar Todas
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {savedSimulations.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <GitCompare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg font-medium">Nenhuma simulação para comparar</p>
+                    <p className="text-sm mt-2">
+                      Faça simulações nas abas "Por Meta" ou "Por Aporte" e clique em "Comparar" para adicioná-las aqui.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {savedSimulations.map((sim) => (
+                      <Card key={sim.id} className={`relative ${sim.type === "goal" ? "border-primary/30 bg-primary/5" : "border-success/30 bg-success/5"}`}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 h-6 w-6"
+                          onClick={() => removeSimulation(sim.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <CardContent className="pt-6">
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              {sim.type === "goal" ? (
+                                <Target className="h-4 w-4 text-primary" />
+                              ) : (
+                                <TrendingUp className="h-4 w-4 text-success" />
+                              )}
+                              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                {sim.type === "goal" ? "Por Meta" : "Por Aporte"}
+                              </span>
+                            </div>
+                            
+                            <p className="font-semibold text-sm truncate">{sim.name}</p>
+                            
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Valor Inicial:</span>
+                                <span className="font-medium">{formatCurrency(sim.initialValue)}</span>
+                              </div>
+                              
+                              {sim.type === "goal" && sim.target && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Meta:</span>
+                                  <span className="font-medium">{formatCurrency(sim.target)}</span>
+                                </div>
+                              )}
+                              
+                              {sim.type === "contribution" && sim.monthlyContribution && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Aporte Mensal:</span>
+                                  <span className="font-medium">{formatCurrency(sim.monthlyContribution)}</span>
+                                </div>
+                              )}
+                              
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Prazo:</span>
+                                <span className="font-medium">{sim.years} anos</span>
+                              </div>
+                              
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Taxa:</span>
+                                <span className="font-medium">{sim.rate}% a.a.</span>
+                              </div>
+                            </div>
+                            
+                            <div className="pt-3 border-t border-border">
+                              {sim.type === "goal" ? (
+                                <div className="text-center">
+                                  <p className="text-xs text-muted-foreground">Aporte Mensal Necessário</p>
+                                  <p className="text-xl font-bold text-primary">{formatCurrency(sim.result)}</p>
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  <div className="text-center">
+                                    <p className="text-xs text-muted-foreground">Valor Futuro</p>
+                                    <p className="text-xl font-bold text-success">{formatCurrency(sim.result)}</p>
+                                  </div>
+                                  {sim.earnings && (
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-muted-foreground">Rendimentos:</span>
+                                      <span className="text-success font-medium">{formatCurrency(sim.earnings)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
