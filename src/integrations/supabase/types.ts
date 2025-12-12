@@ -173,6 +173,57 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_simulations: {
+        Row: {
+          created_at: string
+          earnings: number | null
+          id: string
+          initial_value: number
+          monthly_contribution: number | null
+          name: string
+          rate: number
+          result: number
+          target: number | null
+          total_invested: number | null
+          type: string
+          updated_at: string
+          user_id: string
+          years: number
+        }
+        Insert: {
+          created_at?: string
+          earnings?: number | null
+          id?: string
+          initial_value?: number
+          monthly_contribution?: number | null
+          name: string
+          rate: number
+          result: number
+          target?: number | null
+          total_invested?: number | null
+          type: string
+          updated_at?: string
+          user_id: string
+          years: number
+        }
+        Update: {
+          created_at?: string
+          earnings?: number | null
+          id?: string
+          initial_value?: number
+          monthly_contribution?: number | null
+          name?: string
+          rate?: number
+          result?: number
+          target?: number | null
+          total_invested?: number | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+          years?: number
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number

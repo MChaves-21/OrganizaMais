@@ -4,25 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calculator, Target, TrendingUp, FileDown, Plus, X, GitCompare } from "lucide-react";
+import { Calculator, Target, TrendingUp, FileDown, Plus, X, GitCompare, Loader2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-
-interface SavedSimulation {
-  id: string;
-  type: "goal" | "contribution";
-  name: string;
-  initialValue: number;
-  target?: number;
-  monthlyContribution?: number;
-  years: number;
-  rate: number;
-  result: number;
-  totalInvested?: number;
-  earnings?: number;
-  createdAt: Date;
-}
+import { useSavedSimulations, SavedSimulation } from "@/hooks/useSavedSimulations";
 
 const Simulation = () => {
   // Goal-driven projection
@@ -43,8 +29,16 @@ const Simulation = () => {
     earnings: number;
   } | null>(null);
 
-  // Saved simulations for comparison
-  const [savedSimulations, setSavedSimulations] = useState<SavedSimulation[]>([]);
+  // Saved simulations from database
+  const { 
+    simulations: savedSimulations, 
+    isLoading, 
+    saveSimulation, 
+    deleteSimulation, 
+    deleteAllSimulations,
+    isSaving,
+    isDeleting 
+  } = useSavedSimulations();
 
   const calculateMonthlyContribution = () => {
     const initial = parseFloat(goalInitialValue) || 0;
@@ -241,47 +235,39 @@ const Simulation = () => {
   const saveGoalSimulation = () => {
     if (goalResult === null) return;
     
-    const simulation: SavedSimulation = {
-      id: Date.now().toString(),
+    saveSimulation({
       type: "goal",
       name: `Meta ${formatCurrency(parseFloat(goalTarget))} em ${goalYears}a`,
-      initialValue: parseFloat(goalInitialValue) || 0,
+      initial_value: parseFloat(goalInitialValue) || 0,
       target: parseFloat(goalTarget),
       years: parseFloat(goalYears),
       rate: parseFloat(goalRate),
       result: goalResult,
-      createdAt: new Date(),
-    };
-    
-    setSavedSimulations([...savedSimulations, simulation]);
+    });
   };
 
   const saveContributionSimulation = () => {
     if (!contributionResult) return;
     
-    const simulation: SavedSimulation = {
-      id: Date.now().toString(),
+    saveSimulation({
       type: "contribution",
       name: `${formatCurrency(parseFloat(monthlyContribution))}/mês por ${contributionYears}a`,
-      initialValue: parseFloat(contributionInitialValue) || 0,
-      monthlyContribution: parseFloat(monthlyContribution),
+      initial_value: parseFloat(contributionInitialValue) || 0,
+      monthly_contribution: parseFloat(monthlyContribution),
       years: parseFloat(contributionYears),
       rate: parseFloat(contributionRate),
       result: contributionResult.futureValue,
-      totalInvested: contributionResult.totalInvested,
+      total_invested: contributionResult.totalInvested,
       earnings: contributionResult.earnings,
-      createdAt: new Date(),
-    };
-    
-    setSavedSimulations([...savedSimulations, simulation]);
+    });
   };
 
   const removeSimulation = (id: string) => {
-    setSavedSimulations(savedSimulations.filter(s => s.id !== id));
+    deleteSimulation(id);
   };
 
   const clearAllSimulations = () => {
-    setSavedSimulations([]);
+    deleteAllSimulations();
   };
 
   const exportComparisonPDF = () => {
@@ -309,7 +295,7 @@ const Simulation = () => {
         head: [["Nome", "Valor Inicial", "Meta", "Prazo", "Taxa", "Aporte Mensal"]],
         body: goalSimulations.map(sim => [
           sim.name,
-          formatCurrency(sim.initialValue),
+          formatCurrency(sim.initial_value),
           formatCurrency(sim.target || 0),
           `${sim.years} anos`,
           `${sim.rate}%`,
@@ -334,8 +320,8 @@ const Simulation = () => {
         head: [["Nome", "Valor Inicial", "Aporte Mensal", "Prazo", "Taxa", "Valor Futuro", "Rendimentos"]],
         body: contributionSimulations.map(sim => [
           sim.name,
-          formatCurrency(sim.initialValue),
-          formatCurrency(sim.monthlyContribution || 0),
+          formatCurrency(sim.initial_value),
+          formatCurrency(sim.monthly_contribution || 0),
           `${sim.years} anos`,
           `${sim.rate}%`,
           formatCurrency(sim.result),
@@ -366,8 +352,8 @@ const Simulation = () => {
           const totalMonths = sim.years * 12;
           
           if (sim.type === "contribution") {
-            const futureValueOfInitial = sim.initialValue * Math.pow(1 + monthlyRate, totalMonths);
-            const pmt = sim.monthlyContribution || 0;
+            const futureValueOfInitial = sim.initial_value * Math.pow(1 + monthlyRate, totalMonths);
+            const pmt = sim.monthly_contribution || 0;
             const futureValueOfContributions = totalMonths > 0 
               ? pmt * ((Math.pow(1 + monthlyRate, totalMonths) - 1) / monthlyRate)
               : 0;
@@ -381,8 +367,8 @@ const Simulation = () => {
           const monthlyRate = sim.rate / 100 / 12;
           
           if (sim.type === "contribution") {
-            const futureValueOfInitial = sim.initialValue * Math.pow(1 + monthlyRate, months);
-            const pmt = sim.monthlyContribution || 0;
+            const futureValueOfInitial = sim.initial_value * Math.pow(1 + monthlyRate, months);
+            const pmt = sim.monthly_contribution || 0;
             const futureValueOfContributions = months > 0 
               ? pmt * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate)
               : 0;
@@ -390,7 +376,7 @@ const Simulation = () => {
           } else {
             // Goal simulation - calculate progress toward target
             const pmt = sim.result;
-            const futureValueOfInitial = sim.initialValue * Math.pow(1 + monthlyRate, months);
+            const futureValueOfInitial = sim.initial_value * Math.pow(1 + monthlyRate, months);
             const futureValueOfContributions = months > 0 
               ? pmt * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate)
               : 0;
@@ -861,7 +847,7 @@ const Simulation = () => {
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">Valor Inicial:</span>
-                                  <span className="font-medium">{formatCurrency(sim.initialValue)}</span>
+                                  <span className="font-medium">{formatCurrency(sim.initial_value)}</span>
                                 </div>
                                 
                                 {sim.type === "goal" && sim.target && (
@@ -871,10 +857,10 @@ const Simulation = () => {
                                   </div>
                                 )}
                                 
-                                {sim.type === "contribution" && sim.monthlyContribution && (
+                                {sim.type === "contribution" && sim.monthly_contribution && (
                                   <div className="flex justify-between">
                                     <span className="text-muted-foreground">Aporte Mensal:</span>
-                                    <span className="font-medium">{formatCurrency(sim.monthlyContribution)}</span>
+                                    <span className="font-medium">{formatCurrency(sim.monthly_contribution)}</span>
                                   </div>
                                 )}
                                 
