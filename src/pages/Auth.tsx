@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock } from "lucide-react";
-import nexosLogo from "@/assets/nexos-logo-optimized.webp";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -109,7 +108,7 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center mb-8 gap-3 opacity-0 animate-fade-in-up">
-          <img src={nexosLogo} alt="NEXOS" className="h-12 w-12 rounded-lg shadow-md" fetchPriority="high" />
+          <img src="/nexos-logo.webp" alt="NEXOS" className="h-12 w-12 rounded-lg shadow-md" fetchPriority="high" />
           <h1 className="text-4xl font-bold text-primary">NEXOS</h1>
         </div>
 
