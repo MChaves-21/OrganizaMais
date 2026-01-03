@@ -55,6 +55,24 @@ const Layout = ({ children }: LayoutProps) => {
     }
   };
 
+  // Prefetch map for lazy-loaded pages
+  const prefetchMap: Record<string, () => Promise<unknown>> = {
+    "/": () => import("@/pages/Index"),
+    "/expenses": () => import("@/pages/Expenses"),
+    "/investments": () => import("@/pages/Investments"),
+    "/goals": () => import("@/pages/Goals"),
+    "/budgets": () => import("@/pages/Budgets"),
+    "/simulation": () => import("@/pages/Simulation"),
+    "/reports": () => import("@/pages/Reports"),
+  };
+
+  const handlePrefetch = (to: string) => {
+    const prefetch = prefetchMap[to];
+    if (prefetch) {
+      prefetch();
+    }
+  };
+
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/expenses", icon: Wallet, label: "Gastos" },
@@ -68,7 +86,12 @@ const Layout = ({ children }: LayoutProps) => {
   const NavLinks = () => (
     <>
       {navItems.map(({ to, icon: Icon, label }) => (
-        <Link key={to} to={to}>
+        <Link 
+          key={to} 
+          to={to}
+          onMouseEnter={() => handlePrefetch(to)}
+          onFocus={() => handlePrefetch(to)}
+        >
           <Button
             variant={location.pathname === to ? "default" : "ghost"}
             className="w-full justify-start gap-3"
