@@ -1,8 +1,9 @@
 import { ReactNode, useState, useEffect, useTransition } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Wallet, TrendingUp, Menu, Calculator, LogOut, LogIn, Moon, Sun, Target, Receipt, FileText, Loader2 } from "lucide-react";
 import nexosLogo from "@/assets/nexos-logo-optimized.webp";
 import { Button } from "@/components/ui/button";
+import Footer from "@/components/Footer";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -133,7 +134,7 @@ const Layout = ({ children }: LayoutProps) => {
   );
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-muted/30 flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
@@ -185,7 +186,7 @@ const Layout = ({ children }: LayoutProps) => {
         </div>
       </header>
 
-      <div className="container flex gap-6 py-6">
+      <div className="container flex gap-6 py-6 flex-1">
         {/* Sidebar - Desktop */}
         <aside className="hidden lg:flex w-64 flex-col gap-2 sticky top-20 h-fit">
           <nav className="flex flex-col gap-2">
@@ -196,6 +197,8 @@ const Layout = ({ children }: LayoutProps) => {
         {/* Main Content */}
         <main className="flex-1">{children}</main>
       </div>
+
+      <Footer />
     </div>
   );
 };
