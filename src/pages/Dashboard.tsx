@@ -15,6 +15,7 @@ import { useInvestments } from "@/hooks/useInvestments";
 import { useGoals } from "@/hooks/useGoals";
 import { cn } from "@/lib/utils";
 import { StatCardSkeleton, ChartSkeleton } from "@/components/skeletons";
+import WealthEvolutionChart from "@/components/charts/WealthEvolutionChart";
 
 const Dashboard = () => {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -496,6 +497,9 @@ const Dashboard = () => {
           variant="destructive"
         />
       </div>
+
+      {/* Gráfico de Evolução Patrimonial Detalhada */}
+      <WealthEvolutionChart />
 
       {/* Charts Row 1 */}
       <div className="grid gap-4 md:grid-cols-2">
