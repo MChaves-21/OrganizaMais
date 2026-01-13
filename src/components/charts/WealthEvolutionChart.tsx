@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { TrendingUp, TrendingDown, Calendar, Sparkles, Target, Pencil, X, Check } from "lucide-react";
+import { TrendingUp, TrendingDown, Calendar, Sparkles, Target, X, Check, CalendarClock } from "lucide-react";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useInvestments } from "@/hooks/useInvestments";
 
@@ -266,6 +266,53 @@ const WealthEvolutionChart = () => {
 
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  };
+
+  // Calcular estimativa de quando a meta será atingida
+  const goalEstimate = useMemo(() => {
+    if (!wealthGoal || stats.currentValue >= wealthGoal) {
+      return null;
+    }
+
+    const monthlyGrowthRate = stats.avgMonthlyGrowthRate / 100; // Converter de porcentagem
+    const monthlySavings = Math.max(0, stats.avgMonthlySavings);
+    
+    // Se taxa de crescimento é muito baixa ou negativa e não há aportes significativos
+    if (monthlyGrowthRate <= 0 && monthlySavings <= 0) {
+      return { months: null, reachable: false, estimatedDate: null };
+    }
+
+    // Simulação mês a mês para encontrar quando atinge a meta
+    let currentValue = stats.currentValue;
+    let months = 0;
+    const maxMonths = 360; // Limite de 30 anos
+
+    while (currentValue < wealthGoal && months < maxMonths) {
+      currentValue = currentValue * (1 + monthlyGrowthRate) + monthlySavings;
+      months++;
+    }
+
+    if (months >= maxMonths) {
+      return { months: null, reachable: false, estimatedDate: null };
+    }
+
+    // Calcular data estimada
+    const estimatedDate = new Date();
+    estimatedDate.setMonth(estimatedDate.getMonth() + months);
+
+    return {
+      months,
+      reachable: true,
+      estimatedDate,
+      years: Math.floor(months / 12),
+      remainingMonths: months % 12
+    };
+  }, [wealthGoal, stats.currentValue, stats.avgMonthlyGrowthRate, stats.avgMonthlySavings]);
+
+  const formatEstimatedDate = (date: Date) => {
+    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    return `${months[date.getMonth()]} de ${date.getFullYear()}`;
   };
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -600,12 +647,47 @@ const WealthEvolutionChart = () => {
                 </div>
               </div>
             </div>
-            {showProjection && stats.currentValue < wealthGoal && projection.finalValue >= wealthGoal && (
+
+            {/* Estimativa de quando atinge a meta */}
+            {goalEstimate && stats.currentValue < wealthGoal && (
               <div className="mt-3 pt-3 border-t border-warning/20">
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Sparkles className="h-3 w-3 text-chart-3" />
-                  Com base na projeção, você atingirá sua meta em aproximadamente 12 meses!
-                </p>
+                {goalEstimate.reachable && goalEstimate.estimatedDate ? (
+                  <div className="flex items-start gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <CalendarClock className="h-4 w-4 text-accent" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Estimativa: {formatEstimatedDate(goalEstimate.estimatedDate)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Em aproximadamente{' '}
+                          {goalEstimate.years > 0 && (
+                            <span className="font-medium">{goalEstimate.years} {goalEstimate.years === 1 ? 'ano' : 'anos'}</span>
+                          )}
+                          {goalEstimate.years > 0 && goalEstimate.remainingMonths > 0 && ' e '}
+                          {goalEstimate.remainingMonths > 0 && (
+                            <span className="font-medium">{goalEstimate.remainingMonths} {goalEstimate.remainingMonths === 1 ? 'mês' : 'meses'}</span>
+                          )}
+                          {goalEstimate.years === 0 && goalEstimate.remainingMonths === 0 && (
+                            <span className="font-medium">menos de 1 mês</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="bg-accent/10 text-accent border-accent/30">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      Taxa: {stats.avgMonthlyGrowthRate.toFixed(1)}%/mês
+                    </Badge>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">
+                      Com a taxa de crescimento atual, a meta não será atingida em tempo hábil. 
+                      Considere aumentar seus aportes mensais.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
