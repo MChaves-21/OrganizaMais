@@ -12,17 +12,37 @@ import { useTransactions } from "@/hooks/useTransactions";
 import { useInvestments } from "@/hooks/useInvestments";
 
 type TimeRange = "6m" | "1y" | "2y" | "all";
+type ScenarioType = "base" | "optimistic" | "conservative" | "pessimistic";
+
+const SCENARIO_CONFIG = {
+  base: { label: "Base", color: "chart-3", multiplier: 1 },
+  optimistic: { label: "Otimista", color: "success", multiplier: 1.5 },
+  conservative: { label: "Conservador", color: "warning", multiplier: 0.6 },
+  pessimistic: { label: "Pessimista", color: "destructive", multiplier: 0.2 }
+};
 
 const WEALTH_GOAL_KEY = 'nexos-wealth-goal';
 
 const WealthEvolutionChart = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>("1y");
   const [showProjection, setShowProjection] = useState(true);
+  const [activeScenarios, setActiveScenarios] = useState<ScenarioType[]>(["base"]);
   const [wealthGoal, setWealthGoal] = useState<number | null>(null);
   const [goalInputValue, setGoalInputValue] = useState("");
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const { transactions, isLoading: loadingTransactions } = useTransactions();
   const { investments, isLoading: loadingInvestments } = useInvestments();
+
+  const toggleScenario = (scenario: ScenarioType) => {
+    setActiveScenarios(prev => {
+      if (prev.includes(scenario)) {
+        // Ensure at least one scenario is always active
+        if (prev.length === 1) return prev;
+        return prev.filter(s => s !== scenario);
+      }
+      return [...prev, scenario];
+    });
+  };
 
   // Carregar meta do localStorage
   useEffect(() => {
@@ -178,20 +198,36 @@ const WealthEvolutionChart = () => {
     // Calcular aporte médio mensal
     const avgMonthlySavings = historicalData.reduce((sum, d) => sum + d.saldo, 0) / historicalData.length;
 
-    // Gerar projeção futura (próximos 12 meses)
+    // Gerar projeção futura (próximos 12 meses) para cada cenário
     const projectionMonths = 12;
-    const projectionData: typeof historicalData = [];
-    let projectedWealth = lastValue;
-    let projectedInvestments = historicalData[historicalData.length - 1]?.investimentos || 0;
+    const scenarios: ScenarioType[] = ["base", "optimistic", "conservative", "pessimistic"];
+    
+    const projectionData: (typeof historicalData[0] & {
+      projecaoOtimista?: number | null;
+      projecaoConservadora?: number | null;
+      projecaoPessimista?: number | null;
+    })[] = [];
+
+    // Valores iniciais para cada cenário
+    const scenarioValues = {
+      base: lastValue,
+      optimistic: lastValue,
+      conservative: lastValue,
+      pessimistic: lastValue
+    };
 
     for (let i = 1; i <= projectionMonths; i++) {
       const date = new Date();
       date.setMonth(date.getMonth() + i);
       const fullName = `${monthNames[date.getMonth()]}/${date.getFullYear().toString().slice(-2)}`;
       
-      // Projeção considera crescimento + aporte médio
-      projectedWealth = projectedWealth * (1 + avgMonthlyGrowthRate) + Math.max(0, avgMonthlySavings);
-      projectedInvestments = projectedInvestments * (1 + avgMonthlyGrowthRate * 0.5); // Investimentos crescem mais conservadoramente
+      // Calcular projeção para cada cenário
+      scenarios.forEach(scenario => {
+        const multiplier = SCENARIO_CONFIG[scenario].multiplier;
+        const adjustedGrowthRate = avgMonthlyGrowthRate * multiplier;
+        const adjustedSavings = Math.max(0, avgMonthlySavings) * multiplier;
+        scenarioValues[scenario] = scenarioValues[scenario] * (1 + adjustedGrowthRate) + adjustedSavings;
+      });
 
       projectionData.push({
         name: fullName,
@@ -202,8 +238,11 @@ const WealthEvolutionChart = () => {
         despesas: 0,
         saldo: 0,
         isProjection: true,
-        projecaoPatrimonio: Math.round(projectedWealth),
-        projecaoInvestimentos: Math.round(projectedInvestments)
+        projecaoPatrimonio: Math.round(scenarioValues.base),
+        projecaoInvestimentos: null,
+        projecaoOtimista: Math.round(scenarioValues.optimistic),
+        projecaoConservadora: Math.round(scenarioValues.conservative),
+        projecaoPessimista: Math.round(scenarioValues.pessimistic)
       });
     }
 
@@ -211,23 +250,44 @@ const WealthEvolutionChart = () => {
     const transitionPoint = {
       ...historicalData[historicalData.length - 1],
       projecaoPatrimonio: historicalData[historicalData.length - 1].patrimonio,
-      projecaoInvestimentos: historicalData[historicalData.length - 1].investimentos
+      projecaoInvestimentos: historicalData[historicalData.length - 1].investimentos,
+      projecaoOtimista: historicalData[historicalData.length - 1].patrimonio,
+      projecaoConservadora: historicalData[historicalData.length - 1].patrimonio,
+      projecaoPessimista: historicalData[historicalData.length - 1].patrimonio
     };
 
     // Combinar dados históricos e projeção
     const combinedData = [
-      ...historicalData.slice(0, -1),
+      ...historicalData.slice(0, -1).map(d => ({
+        ...d,
+        projecaoOtimista: null as number | null,
+        projecaoConservadora: null as number | null,
+        projecaoPessimista: null as number | null
+      })),
       transitionPoint,
       ...projectionData
     ];
 
+    // Estatísticas finais de cada cenário
+    const scenarioFinalValues = {
+      base: projectionData[projectionData.length - 1]?.projecaoPatrimonio || lastValue,
+      optimistic: projectionData[projectionData.length - 1]?.projecaoOtimista || lastValue,
+      conservative: projectionData[projectionData.length - 1]?.projecaoConservadora || lastValue,
+      pessimistic: projectionData[projectionData.length - 1]?.projecaoPessimista || lastValue
+    };
+
     // Estatísticas de projeção
-    const projectedFinalValue = projectionData[projectionData.length - 1]?.projecaoPatrimonio || lastValue;
+    const projectedFinalValue = scenarioFinalValues.base;
     const projectedGrowth = lastValue > 0 ? ((projectedFinalValue - lastValue) / lastValue) * 100 : 0;
 
     return {
       data: combinedData,
-      historicalData,
+      historicalData: historicalData.map(d => ({
+        ...d,
+        projecaoOtimista: null as number | null,
+        projecaoConservadora: null as number | null,
+        projecaoPessimista: null as number | null
+      })),
       stats: {
         currentValue: lastValue,
         absoluteChange,
@@ -243,7 +303,8 @@ const WealthEvolutionChart = () => {
         finalValue: projectedFinalValue,
         growth: projectedGrowth,
         monthsAhead: projectionMonths
-      }
+      },
+      scenarioFinalValues
     };
   }, [transactions, investments, loadingTransactions, loadingInvestments, timeRange]);
 
@@ -261,7 +322,7 @@ const WealthEvolutionChart = () => {
     );
   }
 
-  const { data, historicalData, stats, projection } = chartData;
+  const { data, historicalData, stats, projection, scenarioFinalValues } = chartData;
   const displayData = showProjection ? data : historicalData;
 
   const formatCurrency = (value: number) => {
@@ -321,7 +382,7 @@ const WealthEvolutionChart = () => {
       const isProjection = tooltipData.isProjection;
       
       return (
-        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+        <div className="bg-card border border-border rounded-lg p-3 shadow-lg max-w-xs">
           <div className="flex items-center gap-2 mb-2">
             <p className="font-semibold text-foreground">{label}</p>
             {isProjection && (
@@ -334,16 +395,32 @@ const WealthEvolutionChart = () => {
           <div className="space-y-1 text-sm">
             {isProjection ? (
               <>
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Patrimônio Projetado:</span>
-                  <span className="font-medium text-chart-3">{formatCurrency(tooltipData.projecaoPatrimonio)}</span>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Investimentos Projetados:</span>
-                  <span className="font-medium">{formatCurrency(tooltipData.projecaoInvestimentos)}</span>
-                </div>
+                {activeScenarios.includes("base") && tooltipData.projecaoPatrimonio != null && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Base:</span>
+                    <span className="font-medium text-chart-3">{formatCurrency(tooltipData.projecaoPatrimonio)}</span>
+                  </div>
+                )}
+                {activeScenarios.includes("optimistic") && tooltipData.projecaoOtimista != null && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Otimista:</span>
+                    <span className="font-medium text-success">{formatCurrency(tooltipData.projecaoOtimista)}</span>
+                  </div>
+                )}
+                {activeScenarios.includes("conservative") && tooltipData.projecaoConservadora != null && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Conservador:</span>
+                    <span className="font-medium text-warning">{formatCurrency(tooltipData.projecaoConservadora)}</span>
+                  </div>
+                )}
+                {activeScenarios.includes("pessimistic") && tooltipData.projecaoPessimista != null && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Pessimista:</span>
+                    <span className="font-medium text-destructive">{formatCurrency(tooltipData.projecaoPessimista)}</span>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border">
-                  * Baseado na taxa média de crescimento de {stats.avgMonthlyGrowthRate.toFixed(1)}%/mês
+                  * Taxa base: {stats.avgMonthlyGrowthRate.toFixed(1)}%/mês
                 </p>
               </>
             ) : (
@@ -486,16 +563,16 @@ const WealthEvolutionChart = () => {
               <div className="bg-chart-3/10 rounded-lg p-3 border border-chart-3/20">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Sparkles className="h-3 w-3 text-chart-3" />
-                  Projeção 12 meses
+                  Base 12 meses
                 </p>
-                <p className="text-lg font-bold text-chart-3">{formatCurrency(projection.finalValue)}</p>
+                <p className="text-lg font-bold text-chart-3">{formatCurrency(scenarioFinalValues.base)}</p>
               </div>
-              <div className="bg-chart-3/10 rounded-lg p-3 border border-chart-3/20">
+              <div className="bg-success/10 rounded-lg p-3 border border-success/20">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Sparkles className="h-3 w-3 text-chart-3" />
-                  Crescimento Projetado
+                  <TrendingUp className="h-3 w-3 text-success" />
+                  Otimista
                 </p>
-                <p className="text-lg font-bold text-chart-3">+{projection.growth.toFixed(1)}%</p>
+                <p className="text-lg font-bold text-success">{formatCurrency(scenarioFinalValues.optimistic)}</p>
               </div>
             </>
           ) : (
@@ -512,6 +589,32 @@ const WealthEvolutionChart = () => {
           )}
         </div>
 
+        {/* Scenario Toggle Buttons */}
+        {showProjection && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span className="text-sm text-muted-foreground mr-2 self-center">Cenários:</span>
+            {(Object.keys(SCENARIO_CONFIG) as ScenarioType[]).map((scenario) => {
+              const config = SCENARIO_CONFIG[scenario];
+              const isActive = activeScenarios.includes(scenario);
+              return (
+                <Button
+                  key={scenario}
+                  variant={isActive ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => toggleScenario(scenario)}
+                  className={isActive ? `bg-${config.color} hover:bg-${config.color}/90` : ""}
+                  style={isActive ? {
+                    backgroundColor: `hsl(var(--${config.color}))`,
+                    color: config.color === 'warning' ? 'hsl(var(--foreground))' : undefined
+                  } : undefined}
+                >
+                  {config.label}
+                </Button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Chart */}
         <ResponsiveContainer width="100%" height={350}>
           <AreaChart data={displayData}>
@@ -524,9 +627,21 @@ const WealthEvolutionChart = () => {
                 <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3}/>
                 <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0}/>
               </linearGradient>
-              <linearGradient id="colorProjecao" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="colorProjecaoBase" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3}/>
                 <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0}/>
+              </linearGradient>
+              <linearGradient id="colorProjecaoOtimista" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.25}/>
+                <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0}/>
+              </linearGradient>
+              <linearGradient id="colorProjecaoConservadora" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--warning))" stopOpacity={0.25}/>
+                <stop offset="95%" stopColor="hsl(var(--warning))" stopOpacity={0}/>
+              </linearGradient>
+              <linearGradient id="colorProjecaoPessimista" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.25}/>
+                <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0}/>
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -563,17 +678,49 @@ const WealthEvolutionChart = () => {
               fill="url(#colorPatrimonio)"
               strokeWidth={2}
             />
-            {showProjection && (
-              <>
-                <Area
-                  type="monotone"
-                  dataKey="projecaoPatrimonio"
-                  stroke="hsl(var(--chart-3))"
-                  fill="url(#colorProjecao)"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                />
-              </>
+            {/* Cenário Pessimista */}
+            {showProjection && activeScenarios.includes("pessimistic") && (
+              <Area
+                type="monotone"
+                dataKey="projecaoPessimista"
+                stroke="hsl(var(--destructive))"
+                fill="url(#colorProjecaoPessimista)"
+                strokeWidth={2}
+                strokeDasharray="4 4"
+              />
+            )}
+            {/* Cenário Conservador */}
+            {showProjection && activeScenarios.includes("conservative") && (
+              <Area
+                type="monotone"
+                dataKey="projecaoConservadora"
+                stroke="hsl(var(--warning))"
+                fill="url(#colorProjecaoConservadora)"
+                strokeWidth={2}
+                strokeDasharray="4 4"
+              />
+            )}
+            {/* Cenário Base */}
+            {showProjection && activeScenarios.includes("base") && (
+              <Area
+                type="monotone"
+                dataKey="projecaoPatrimonio"
+                stroke="hsl(var(--chart-3))"
+                fill="url(#colorProjecaoBase)"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+              />
+            )}
+            {/* Cenário Otimista */}
+            {showProjection && activeScenarios.includes("optimistic") && (
+              <Area
+                type="monotone"
+                dataKey="projecaoOtimista"
+                stroke="hsl(var(--success))"
+                fill="url(#colorProjecaoOtimista)"
+                strokeWidth={2}
+                strokeDasharray="4 4"
+              />
             )}
             {wealthGoal && (
               <ReferenceLine 
@@ -603,10 +750,28 @@ const WealthEvolutionChart = () => {
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'hsl(var(--chart-2))' }} />
             <span className="text-sm text-muted-foreground">Investimentos</span>
           </div>
-          {showProjection && (
+          {showProjection && activeScenarios.includes("base") && (
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: 'hsl(var(--chart-3))' }} />
-              <span className="text-sm text-muted-foreground">Projeção ({stats.avgMonthlyGrowthRate.toFixed(1)}%/mês)</span>
+              <span className="text-sm text-muted-foreground">Base ({stats.avgMonthlyGrowthRate.toFixed(1)}%/mês)</span>
+            </div>
+          )}
+          {showProjection && activeScenarios.includes("optimistic") && (
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: 'hsl(var(--success))' }} />
+              <span className="text-sm text-muted-foreground">Otimista ({(stats.avgMonthlyGrowthRate * 1.5).toFixed(1)}%/mês)</span>
+            </div>
+          )}
+          {showProjection && activeScenarios.includes("conservative") && (
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: 'hsl(var(--warning))' }} />
+              <span className="text-sm text-muted-foreground">Conservador ({(stats.avgMonthlyGrowthRate * 0.6).toFixed(1)}%/mês)</span>
+            </div>
+          )}
+          {showProjection && activeScenarios.includes("pessimistic") && (
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full border-2 border-dashed" style={{ borderColor: 'hsl(var(--destructive))' }} />
+              <span className="text-sm text-muted-foreground">Pessimista ({(stats.avgMonthlyGrowthRate * 0.2).toFixed(1)}%/mês)</span>
             </div>
           )}
           {wealthGoal && (
