@@ -1,4 +1,4 @@
-import { Wallet, TrendingUp, TrendingDown, PiggyBank, Target, CalendarIcon, X } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, PiggyBank, Target } from "lucide-react";
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -8,8 +8,6 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useInvestments } from "@/hooks/useInvestments";
 import { useGoals } from "@/hooks/useGoals";
@@ -22,8 +20,6 @@ const Dashboard = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedInvestment, setSelectedInvestment] = useState<string | null>(null);
   const [selectedYears, setSelectedYears] = useState<string[]>(["2024", "2023"]);
-  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
-  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
   const { transactions, isLoading: loadingTransactions } = useTransactions();
   const { investments, isLoading: loadingInvestments } = useInvestments();
@@ -38,21 +34,11 @@ const Dashboard = () => {
     const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
     const currentYear = new Date().getFullYear();
     
-    // Filtrar transações por período personalizado
-    const filteredTransactions = transactions.filter(transaction => {
-      const transactionDate = new Date(transaction.date);
-      if (startDate && transactionDate < startDate) return false;
-      if (endDate && transactionDate > endDate) return false;
-      return true;
-    });
+    // Usar todas as transações (sem filtro de período)
+    const filteredTransactions = transactions;
 
-    // Filtrar investimentos por período personalizado
-    const filteredInvestments = investments.filter(investment => {
-      const investmentDate = new Date(investment.purchase_date);
-      if (startDate && investmentDate < startDate) return false;
-      if (endDate && investmentDate > endDate) return false;
-      return true;
-    });
+    // Usar todos os investimentos (sem filtro de período)
+    const filteredInvestments = investments;
     
     // Agrupar transações por mês
     const monthlyData: { [key: string]: { income: number; expense: number; month: number; year: number } } = {};
@@ -106,14 +92,11 @@ const Dashboard = () => {
       };
     });
 
-    // Gastos por categoria (filtrado por período ou mês atual)
+    // Gastos por categoria (mês atual)
     const categoryData: { [key: string]: number } = {};
     const currentMonth = new Date().getMonth();
     const currentMonthTransactions = filteredTransactions.filter(t => {
       const date = new Date(t.date);
-      if (startDate || endDate) {
-        return t.type === 'expense';
-      }
       return t.type === 'expense' && date.getMonth() === currentMonth && date.getFullYear() === currentYear;
     });
 
@@ -293,7 +276,7 @@ const Dashboard = () => {
       },
       goalsData
     };
-  }, [transactions, investments, goals, loadingTransactions, loadingInvestments, loadingGoals, startDate, endDate]);
+  }, [transactions, investments, goals, loadingTransactions, loadingInvestments, loadingGoals]);
 
   if (loadingTransactions || loadingInvestments || loadingGoals || !dashboardData) {
     return (
@@ -364,11 +347,6 @@ const Dashboard = () => {
     setSelectedInvestment(null);
   };
 
-  const clearDateFilters = () => {
-    setStartDate(undefined);
-    setEndDate(undefined);
-  };
-
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div>
@@ -376,71 +354,6 @@ const Dashboard = () => {
         <p className="text-muted-foreground mt-1">
           Visão completa das suas finanças
         </p>
-        
-        {/* Filtros de Período Personalizado */}
-        <div className="mt-4 flex flex-wrap gap-3 items-end">
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-foreground">Data Início</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-[200px] justify-start text-left font-normal",
-                    !startDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {startDate ? format(startDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecionar data"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={startDate}
-                  onSelect={setStartDate}
-                  initialFocus
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-foreground">Data Fim</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-[200px] justify-start text-left font-normal",
-                    !endDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {endDate ? format(endDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecionar data"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={endDate}
-                  onSelect={setEndDate}
-                  initialFocus
-                  className="pointer-events-auto"
-                  disabled={(date) => startDate ? date < startDate : false}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {(startDate || endDate) && (
-            <Button variant="ghost" size="sm" onClick={clearDateFilters} className="mb-0.5">
-              <X className="mr-1 h-4 w-4" />
-              Limpar período
-            </Button>
-          )}
-        </div>
 
         {(selectedMonth || selectedCategory || selectedInvestment) && (
           <div className="mt-4 flex items-center gap-2 flex-wrap">
